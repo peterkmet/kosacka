@@ -156,6 +156,8 @@
         pendingColor = color;
         [...els.palette.children].forEach((c) => c.classList.remove("selected"));
         sw.classList.add("selected");
+        // Apply the chosen color to the polygon currently being drawn.
+        if (drawing) { drawing.color = color; render(); }
       });
       els.palette.appendChild(sw);
     });
