@@ -8,7 +8,7 @@
     body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; }
     #sidebar { width: 240px; padding: 12px; box-sizing: border-box; border-right: 1px solid #ccc; overflow-y: auto; }
     #stage { flex: 1; position: relative; overflow: auto; background: #eef; }
-    #stage img { display: block; max-width: none; }
+    #stage img { display: block; object-fit: contain; }
     #svg { position: absolute; top: 0; left: 0; }
     .row { margin-bottom: 10px; }
     label { display: block; font-size: 12px; margin-bottom: 2px; }
@@ -87,9 +87,9 @@
     els.xMax.addEventListener("change", () => { state.xMax = Number(els.xMax.value); syncSvgSize(); render(); });
     els.yMax.addEventListener("change", () => { state.yMax = Number(els.yMax.value); syncSvgSize(); render(); });
 
-    // Canvas size when no image is loaded: the xMax:yMax aspect ratio fitted
-    // into the available stage area.
-    function blankCanvasSize() {
+    // Canvas pixel size: the xMax:yMax aspect ratio fitted into the available
+    // stage area. The canvas — not the image — defines the coordinate space.
+    function canvasSize() {
       const availW = els.stage.clientWidth || 600;
       const availH = els.stage.clientHeight || 400;
       const aspect = state.xMax / state.yMax;
@@ -100,15 +100,17 @@
     }
 
     function displaySize() {
-      if (state.image) return { w: els.bg.clientWidth, h: els.bg.clientHeight };
-      return blankCanvasSize();
+      return canvasSize();
     }
 
     function syncSvgSize() {
       const { w, h } = displaySize();
       els.svg.setAttribute("width", w);
       els.svg.setAttribute("height", h);
-      // Show a visible drawing area when there is no background image.
+      // Scale the background image into the canvas box, preserving its aspect
+      // ratio (object-fit: contain). Empty when no image is loaded.
+      els.bg.style.width = w + "px";
+      els.bg.style.height = h + "px";
       els.svg.style.background = state.image ? "transparent" : "#fff";
     }
 
