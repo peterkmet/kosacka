@@ -57,3 +57,25 @@ describe("close detection", () => {
     expect(isNearFirstPoint([100, 112], [100, 100], 12)).toBe(true);
   });
 });
+
+import { serialize, deserialize } from "./logic.js";
+
+describe("serialize/deserialize", () => {
+  const state = {
+    xMax: 100,
+    yMax: 80,
+    image: "data:image/png;base64,abc",
+    zones: [{ name: "Predok", color: "#22c55e", points: [[10, 20], [30, 40], [10, 40]] }],
+  };
+
+  it("serializes points to strings", () => {
+    const obj = JSON.parse(serialize(state));
+    expect(obj.zones[0].points).toBe("10,20 30,40 10,40");
+    expect(obj.xMax).toBe(100);
+    expect(obj.image).toBe("data:image/png;base64,abc");
+  });
+
+  it("round-trips through serialize then deserialize", () => {
+    expect(deserialize(serialize(state))).toEqual(state);
+  });
+});

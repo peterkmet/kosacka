@@ -40,3 +40,36 @@ export function coordToPixel(coord, displaySize, max) {
 export function isNearFirstPoint(point, firstPoint, thresholdPx) {
   return Math.hypot(point[0] - firstPoint[0], point[1] - firstPoint[1]) <= thresholdPx;
 }
+
+// Convert app state to the export JSON string (points as "x,y x,y" strings).
+export function serialize(state) {
+  return JSON.stringify(
+    {
+      xMax: state.xMax,
+      yMax: state.yMax,
+      image: state.image,
+      zones: state.zones.map((z) => ({
+        name: z.name,
+        color: z.color,
+        points: pointsToString(z.points),
+      })),
+    },
+    null,
+    2,
+  );
+}
+
+// Parse an export JSON string back to app state (points as number arrays).
+export function deserialize(text) {
+  const obj = JSON.parse(text);
+  return {
+    xMax: obj.xMax,
+    yMax: obj.yMax,
+    image: obj.image,
+    zones: obj.zones.map((z) => ({
+      name: z.name,
+      color: z.color,
+      points: parsePoints(z.points),
+    })),
+  };
+}
