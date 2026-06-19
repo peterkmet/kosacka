@@ -25,3 +25,13 @@ export function parsePoints(str) {
   if (trimmed === "") return [];
   return trimmed.split(/\s+/).map((pair) => pair.split(",").map(Number));
 }
+
+// Map a pixel value (within the displayed image) to the xMax/yMax scale.
+export function pixelToCoord(pixel, displaySize, max) {
+  return (pixel / displaySize) * max;
+}
+
+// Map a scaled coordinate back to a pixel value within the displayed image.
+export function coordToPixel(coord, displaySize, max) {
+  return (coord / max) * displaySize;
+}

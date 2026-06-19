@@ -25,3 +25,19 @@ describe("palette", () => {
     expect(PALETTE).toHaveLength(16);
   });
 });
+
+import { pixelToCoord, coordToPixel } from "./logic.js";
+
+describe("scaling", () => {
+  it("maps a pixel to coordinate scale", () => {
+    expect(pixelToCoord(300, 600, 100)).toBe(50);
+  });
+
+  it("maps a coordinate back to pixels", () => {
+    expect(coordToPixel(50, 600, 100)).toBe(300);
+  });
+
+  it("round-trips", () => {
+    expect(coordToPixel(pixelToCoord(123, 600, 100), 600, 100)).toBeCloseTo(123);
+  });
+});
