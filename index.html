@@ -53,11 +53,12 @@
     <svg id="svg"></svg>
   </div>
 
-  <script type="module">
-    import {
-      CLOSE_THRESHOLD_PX, PALETTE, DEFAULT_X_MAX, DEFAULT_Y_MAX,
-      pixelToCoord, coordToPixel, isNearFirstPoint, serialize, deserialize,
-    } from "./logic.js";
+  <script src="logic.js"></script>
+  <script>
+    // logic.js loads above as a classic script, exposing its functions and
+    // constants in the shared global scope: CLOSE_THRESHOLD_PX, PALETTE,
+    // DEFAULT_X_MAX, DEFAULT_Y_MAX, pixelToCoord, coordToPixel,
+    // isNearFirstPoint, serialize, deserialize.
 
     const SVGNS = "http://www.w3.org/2000/svg";
     const state = { xMax: DEFAULT_X_MAX, yMax: DEFAULT_Y_MAX, image: "", zones: [] };
