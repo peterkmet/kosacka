@@ -41,3 +41,19 @@ describe("scaling", () => {
     expect(coordToPixel(pixelToCoord(123, 600, 100), 600, 100)).toBeCloseTo(123);
   });
 });
+
+import { isNearFirstPoint } from "./logic.js";
+
+describe("close detection", () => {
+  it("is true within threshold", () => {
+    expect(isNearFirstPoint([105, 100], [100, 100], 12)).toBe(true);
+  });
+
+  it("is false beyond threshold", () => {
+    expect(isNearFirstPoint([100, 120], [100, 100], 12)).toBe(false);
+  });
+
+  it("is true exactly at threshold", () => {
+    expect(isNearFirstPoint([100, 112], [100, 100], 12)).toBe(true);
+  });
+});

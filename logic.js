@@ -35,3 +35,8 @@ export function pixelToCoord(pixel, displaySize, max) {
 export function coordToPixel(coord, displaySize, max) {
   return (coord / max) * displaySize;
 }
+
+// True when point is within thresholdPx (Euclidean) of firstPoint.
+export function isNearFirstPoint(point, firstPoint, thresholdPx) {
+  return Math.hypot(point[0] - firstPoint[0], point[1] - firstPoint[1]) <= thresholdPx;
+}
