@@ -197,6 +197,17 @@
         .join(" ");
     }
 
+    // Average of a zone's points, in pixel space — used to place its label.
+    function centroidPixel(points) {
+      const { w, h } = displaySize();
+      let sx = 0, sy = 0;
+      points.forEach(([x, y]) => { sx += x; sy += y; });
+      return [
+        coordToPixel(sx / points.length, w, state.xMax),
+        coordToPixel(sy / points.length, h, state.yMax),
+      ];
+    }
+
     function render() {
       els.svg.innerHTML = "";
       state.zones.forEach((zone, i) => {
@@ -213,6 +224,23 @@
           render();
         });
         els.svg.appendChild(poly);
+      });
+
+      // Zone name labels, centered, dark font, drawn on top of the polygons.
+      state.zones.forEach((zone) => {
+        if (zone.points.length === 0) return;
+        const [cx, cy] = centroidPixel(zone.points);
+        const label = document.createElementNS(SVGNS, "text");
+        label.setAttribute("x", cx);
+        label.setAttribute("y", cy);
+        label.setAttribute("text-anchor", "middle");
+        label.setAttribute("dominant-baseline", "central");
+        label.setAttribute("fill", "#1f2937");
+        label.setAttribute("font-size", "13");
+        label.setAttribute("font-family", "sans-serif");
+        label.setAttribute("pointer-events", "none");
+        label.textContent = zone.name;
+        els.svg.appendChild(label);
       });
 
       if (drawing && drawing.points.length > 0) {
