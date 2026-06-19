@@ -34,14 +34,16 @@ restore the scale, image, and polygons.
 ## 4. Coordinate System and Canvas
 
 - Origin top-left, SVG convention. `x` grows right, `y` grows down.
-- The canvas uses the `xMax` : `yMax` aspect ratio, fitted into the available area.
-  The canvas — not the image — defines the coordinate space.
-- A selected background image is scaled into the canvas box, preserving its own aspect
-  ratio (`object-fit: contain`). If no image is selected, the canvas is blank (white).
-- Stored point values are in `xMax` / `yMax` scale, not raw pixels:
-  - `coordX = pixelX / canvasWidth * xMax`
-  - `coordY = pixelY / canvasHeight * yMax`
-- The inverse is used to render stored polygons back onto the canvas.
+- Points are stored normalized (0..1) relative to the canvas, independent of the scale.
+  The on-screen drawing therefore does not change when `xMax`/`yMax` change.
+- `xMax`/`yMax` only matter at export and import — they define the scale written into
+  the JSON:
+  - export: `value = norm * xMax` (and `norm * yMax`)
+  - import: `norm = value / xMax` (and `value / yMax`)
+- Canvas aspect ratio is taken from the loaded image (so it is never distorted); with no
+  image it falls back to the `xMax` : `yMax` ratio. The canvas is fitted into the
+  available area and the image fills it.
+- Rendering maps normalized points to canvas pixels: `pixel = norm * canvasSize`.
 
 ## 5. Data Format
 
@@ -83,10 +85,11 @@ The selectable background images are defined in the `ASSETS` list inside `index.
 
 ### Pure functions (unit-tested with Vitest)
 
-- `pixelToCoord(pixel, displaySize, max)` / `coordToPixel(coord, displaySize, max)`
+- `pixelToNorm(pixel, displaySize)` / `normToPixel(norm, displaySize)`
 - `pointsToString(points)` / `parsePoints(str)`
 - `isNearFirstPoint(point, firstPoint, thresholdPx)`
-- `serialize(state)` / `deserialize(json)`
+- `serialize(state)` / `deserialize(json)` — scale normalized points by `xMax`/`yMax`
+  on export and divide back on import
 
 ### Manual verification only
 

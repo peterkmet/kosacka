@@ -19,8 +19,9 @@ npx serve .
 
 - **Background image** — pick one from the dropdown (entries are defined in the
   `ASSETS` list inside `index.html`), or "none" to draw on a blank canvas.
-- **x-max / y-max** — the coordinate scale. The canvas uses this aspect ratio and the
-  image is scaled into it (aspect ratio preserved).
+- **x-max / y-max** — the coordinate scale used only when exporting/importing the JSON.
+  Changing them does not move the on-screen drawing (points are stored normalized). The
+  canvas follows the image's aspect ratio, or x-max : y-max when no image is loaded.
 - **New polygon** — enter a name, pick a color from the palette, then click to add
   points. Click near the first point to close the polygon. `Esc` removes the last point.
   The polygon's name is shown centered inside it.
