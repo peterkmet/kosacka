@@ -84,17 +84,32 @@
 
     els.xMax.value = state.xMax;
     els.yMax.value = state.yMax;
-    els.xMax.addEventListener("change", () => { state.xMax = Number(els.xMax.value); });
-    els.yMax.addEventListener("change", () => { state.yMax = Number(els.yMax.value); });
+    els.xMax.addEventListener("change", () => { state.xMax = Number(els.xMax.value); syncSvgSize(); render(); });
+    els.yMax.addEventListener("change", () => { state.yMax = Number(els.yMax.value); syncSvgSize(); render(); });
+
+    // Canvas size when no image is loaded: the xMax:yMax aspect ratio fitted
+    // into the available stage area.
+    function blankCanvasSize() {
+      const availW = els.stage.clientWidth || 600;
+      const availH = els.stage.clientHeight || 400;
+      const aspect = state.xMax / state.yMax;
+      let w = availW;
+      let h = w / aspect;
+      if (h > availH) { h = availH; w = h * aspect; }
+      return { w: Math.floor(w), h: Math.floor(h) };
+    }
 
     function displaySize() {
-      return { w: els.bg.clientWidth, h: els.bg.clientHeight };
+      if (state.image) return { w: els.bg.clientWidth, h: els.bg.clientHeight };
+      return blankCanvasSize();
     }
 
     function syncSvgSize() {
       const { w, h } = displaySize();
       els.svg.setAttribute("width", w);
       els.svg.setAttribute("height", h);
+      // Show a visible drawing area when there is no background image.
+      els.svg.style.background = state.image ? "transparent" : "#fff";
     }
 
     function setImage(dataUrl) {
@@ -135,7 +150,7 @@
 
     // Convert a mouse event to coord-scale point.
     function eventToCoord(e) {
-      const rect = els.bg.getBoundingClientRect();
+      const rect = els.svg.getBoundingClientRect();
       const px = e.clientX - rect.left;
       const py = e.clientY - rect.top;
       const { w, h } = displaySize();
@@ -260,11 +275,18 @@
         drawing = null;
         els.paletteRow.style.display = "none";
         setImage(loaded.image);
+        // setImage triggers render via the image load event; with no image,
+        // size and render the blank canvas directly.
+        if (!loaded.image) { syncSvgSize(); render(); }
       };
       reader.readAsText(file);
     });
 
     window.addEventListener("resize", () => { syncSvgSize(); render(); });
+
+    // Show the blank drawing canvas immediately on load.
+    syncSvgSize();
+    render();
   </script>
 </body>
 </html>
