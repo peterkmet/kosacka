@@ -26,7 +26,7 @@
   <div id="sidebar">
     <div class="row">
       <label>Background image</label>
-      <input type="file" id="imageInput" accept="image/*" />
+      <select id="imageSelect"></select>
     </div>
     <div class="row">
       <label>x-max</label><input type="number" id="xMax" />
@@ -66,8 +66,15 @@
     let pendingColor = PALETTE[0];
     let selectedIndex = -1;
 
+    // Selectable background images, served from the assets/ folder. Add a new
+    // line here to offer another image (directory listing is not possible on file://).
+    const ASSETS = [
+      { label: "Náčrt", path: "assets/podklad-nakres.jpg" },
+      { label: "Mapa", path: "assets/podklad-mapa.jpg" },
+    ];
+
     const els = {
-      imageInput: document.getElementById("imageInput"),
+      imageSelect: document.getElementById("imageSelect"),
       xMax: document.getElementById("xMax"),
       yMax: document.getElementById("yMax"),
       newPolygon: document.getElementById("newPolygon"),
@@ -114,19 +121,31 @@
       els.svg.style.background = state.image ? "transparent" : "#fff";
     }
 
-    function setImage(dataUrl) {
-      state.image = dataUrl;
-      els.bg.src = dataUrl;
+    // path is an assets/ file path, or "" for no background image.
+    function setImage(path) {
+      state.image = path;
+      if (path) {
+        els.bg.src = path;        // the load event re-syncs the canvas and renders
+      } else {
+        els.bg.removeAttribute("src");
+        syncSvgSize();
+        render();
+      }
     }
     els.bg.addEventListener("load", () => { syncSvgSize(); render(); });
 
-    els.imageInput.addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => setImage(reader.result);
-      reader.readAsDataURL(file);
+    // Populate the background image dropdown.
+    const noneOption = document.createElement("option");
+    noneOption.value = "";
+    noneOption.textContent = "— žiadny —";
+    els.imageSelect.appendChild(noneOption);
+    ASSETS.forEach((a) => {
+      const opt = document.createElement("option");
+      opt.value = a.path;
+      opt.textContent = a.label;
+      els.imageSelect.appendChild(opt);
     });
+    els.imageSelect.addEventListener("change", () => setImage(els.imageSelect.value));
 
     // Build palette swatches.
     PALETTE.forEach((color) => {
@@ -304,10 +323,8 @@
         selectedIndex = -1;
         drawing = null;
         els.paletteRow.style.display = "none";
-        setImage(loaded.image);
-        // setImage triggers render via the image load event; with no image,
-        // size and render the blank canvas directly.
-        if (!loaded.image) { syncSvgSize(); render(); }
+        els.imageSelect.value = loaded.image || "";
+        setImage(loaded.image || "");
       };
       reader.readAsText(file);
     });
