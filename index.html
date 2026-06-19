@@ -57,7 +57,7 @@
   <script>
     // logic.js loads above as a classic script, exposing its functions and
     // constants in the shared global scope: CLOSE_THRESHOLD_PX, PALETTE,
-    // DEFAULT_X_MAX, DEFAULT_Y_MAX, pixelToCoord, coordToPixel,
+    // DEFAULT_X_MAX, DEFAULT_Y_MAX, pixelToNorm, normToPixel,
     // isNearFirstPoint, serialize, deserialize.
 
     const SVGNS = "http://www.w3.org/2000/svg";
@@ -94,12 +94,16 @@
     els.xMax.addEventListener("change", () => { state.xMax = Number(els.xMax.value); syncSvgSize(); render(); });
     els.yMax.addEventListener("change", () => { state.yMax = Number(els.yMax.value); syncSvgSize(); render(); });
 
-    // Canvas pixel size: the xMax:yMax aspect ratio fitted into the available
-    // stage area. The canvas — not the image — defines the coordinate space.
+    // Canvas pixel size, fitted into the available stage area. The aspect ratio
+    // comes from the loaded image (so it is never distorted); without an image,
+    // it falls back to the xMax:yMax ratio. xMax/yMax otherwise only affect
+    // export/import scale, not the on-screen drawing (points are normalized).
     function canvasSize() {
       const availW = els.stage.clientWidth || 600;
       const availH = els.stage.clientHeight || 400;
-      const aspect = state.xMax / state.yMax;
+      const aspect = (state.image && els.bg.naturalWidth)
+        ? els.bg.naturalWidth / els.bg.naturalHeight
+        : state.xMax / state.yMax;
       let w = availW;
       let h = w / aspect;
       if (h > availH) { h = availH; w = h * aspect; }
@@ -171,25 +175,25 @@
       render();
     });
 
-    // Convert a mouse event to coord-scale point.
-    function eventToCoord(e) {
+    // Convert a mouse event to a normalized (0..1) canvas point.
+    function eventToNorm(e) {
       const rect = els.svg.getBoundingClientRect();
       const px = e.clientX - rect.left;
       const py = e.clientY - rect.top;
       const { w, h } = displaySize();
-      return [pixelToCoord(px, w, state.xMax), pixelToCoord(py, h, state.yMax)];
+      return [pixelToNorm(px, w), pixelToNorm(py, h)];
     }
 
     els.svg.addEventListener("click", (e) => {
       if (!drawing) return;
-      const coord = eventToCoord(e);
+      const norm = eventToNorm(e);
       const { w, h } = displaySize();
       if (drawing.points.length >= 3) {
         const firstPx = [
-          coordToPixel(drawing.points[0][0], w, state.xMax),
-          coordToPixel(drawing.points[0][1], h, state.yMax),
+          normToPixel(drawing.points[0][0], w),
+          normToPixel(drawing.points[0][1], h),
         ];
-        const clickPx = [coordToPixel(coord[0], w, state.xMax), coordToPixel(coord[1], h, state.yMax)];
+        const clickPx = [normToPixel(norm[0], w), normToPixel(norm[1], h)];
         if (isNearFirstPoint(clickPx, firstPx, CLOSE_THRESHOLD_PX)) {
           state.zones.push({ name: drawing.name, color: drawing.color, points: drawing.points });
           drawing = null;
@@ -198,7 +202,7 @@
           return;
         }
       }
-      drawing.points.push(coord);
+      drawing.points.push(norm);
       render();
     });
 
@@ -213,21 +217,21 @@
       }
     });
 
-    function coordPointsToPixelString(points) {
+    function normPointsToPixelString(points) {
       const { w, h } = displaySize();
       return points
-        .map(([x, y]) => `${coordToPixel(x, w, state.xMax)},${coordToPixel(y, h, state.yMax)}`)
+        .map(([nx, ny]) => `${normToPixel(nx, w)},${normToPixel(ny, h)}`)
         .join(" ");
     }
 
-    // Average of a zone's points, in pixel space — used to place its label.
+    // Average of a zone's normalized points, in pixel space — places its label.
     function centroidPixel(points) {
       const { w, h } = displaySize();
       let sx = 0, sy = 0;
-      points.forEach(([x, y]) => { sx += x; sy += y; });
+      points.forEach(([nx, ny]) => { sx += nx; sy += ny; });
       return [
-        coordToPixel(sx / points.length, w, state.xMax),
-        coordToPixel(sy / points.length, h, state.yMax),
+        normToPixel(sx / points.length, w),
+        normToPixel(sy / points.length, h),
       ];
     }
 
@@ -235,7 +239,7 @@
       els.svg.innerHTML = "";
       state.zones.forEach((zone, i) => {
         const poly = document.createElementNS(SVGNS, "polygon");
-        poly.setAttribute("points", coordPointsToPixelString(zone.points));
+        poly.setAttribute("points", normPointsToPixelString(zone.points));
         poly.setAttribute("fill", zone.color);
         poly.setAttribute("fill-opacity", i === selectedIndex ? "0.6" : "0.35");
         poly.setAttribute("stroke", zone.color);
@@ -268,16 +272,16 @@
 
       if (drawing && drawing.points.length > 0) {
         const line = document.createElementNS(SVGNS, "polyline");
-        line.setAttribute("points", coordPointsToPixelString(drawing.points));
+        line.setAttribute("points", normPointsToPixelString(drawing.points));
         line.setAttribute("fill", "none");
         line.setAttribute("stroke", drawing.color);
         line.setAttribute("stroke-width", "2");
         els.svg.appendChild(line);
         const { w, h } = displaySize();
-        drawing.points.forEach(([x, y]) => {
+        drawing.points.forEach(([nx, ny]) => {
           const c = document.createElementNS(SVGNS, "circle");
-          c.setAttribute("cx", coordToPixel(x, w, state.xMax));
-          c.setAttribute("cy", coordToPixel(y, h, state.yMax));
+          c.setAttribute("cx", normToPixel(nx, w));
+          c.setAttribute("cy", normToPixel(ny, h));
           c.setAttribute("r", "4");
           c.setAttribute("fill", drawing.color);
           els.svg.appendChild(c);

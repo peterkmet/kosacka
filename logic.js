@@ -26,14 +26,16 @@ function parsePoints(str) {
   return trimmed.split(/\s+/).map((pair) => pair.split(",").map(Number));
 }
 
-// Map a pixel value (within the displayed image) to the xMax/yMax scale.
-function pixelToCoord(pixel, displaySize, max) {
-  return (pixel / displaySize) * max;
+// Map a pixel value within the canvas to a 0..1 fraction of the canvas.
+// Points are stored normalized so the on-screen drawing is independent of the
+// xMax/yMax scale (which only matters at export/import).
+function pixelToNorm(pixel, displaySize) {
+  return pixel / displaySize;
 }
 
-// Map a scaled coordinate back to a pixel value within the displayed image.
-function coordToPixel(coord, displaySize, max) {
-  return (coord / max) * displaySize;
+// Map a 0..1 fraction back to a pixel value within the canvas.
+function normToPixel(norm, displaySize) {
+  return norm * displaySize;
 }
 
 // True when point is within thresholdPx (Euclidean) of firstPoint.
@@ -41,7 +43,8 @@ function isNearFirstPoint(point, firstPoint, thresholdPx) {
   return Math.hypot(point[0] - firstPoint[0], point[1] - firstPoint[1]) <= thresholdPx;
 }
 
-// Convert app state to the export JSON string (points as "x,y x,y" strings).
+// Convert app state to the export JSON string. Normalized points (0..1) are
+// scaled by xMax/yMax so the JSON carries coordinates in the chosen scale.
 function serialize(state) {
   return JSON.stringify(
     {
@@ -51,7 +54,9 @@ function serialize(state) {
       zones: state.zones.map((z) => ({
         name: z.name,
         color: z.color,
-        points: pointsToString(z.points),
+        points: pointsToString(
+          z.points.map(([nx, ny]) => [nx * state.xMax, ny * state.yMax]),
+        ),
       })),
     },
     null,
@@ -59,7 +64,8 @@ function serialize(state) {
   );
 }
 
-// Parse an export JSON string back to app state (points as number arrays).
+// Parse an export JSON string back to app state. Points in xMax/yMax scale are
+// divided back into normalized (0..1) values.
 function deserialize(text) {
   const obj = JSON.parse(text);
   return {
@@ -69,7 +75,7 @@ function deserialize(text) {
     zones: obj.zones.map((z) => ({
       name: z.name,
       color: z.color,
-      points: parsePoints(z.points),
+      points: parsePoints(z.points).map(([x, y]) => [x / obj.xMax, y / obj.yMax]),
     })),
   };
 }
@@ -79,7 +85,7 @@ function deserialize(text) {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     CLOSE_THRESHOLD_PX, DEFAULT_X_MAX, DEFAULT_Y_MAX, PALETTE,
-    pointsToString, parsePoints, pixelToCoord, coordToPixel,
+    pointsToString, parsePoints, pixelToNorm, normToPixel,
     isNearFirstPoint, serialize, deserialize,
   };
 }

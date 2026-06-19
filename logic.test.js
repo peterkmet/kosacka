@@ -26,19 +26,19 @@ describe("palette", () => {
   });
 });
 
-import { pixelToCoord, coordToPixel } from "./logic.js";
+import { pixelToNorm, normToPixel } from "./logic.js";
 
-describe("scaling", () => {
-  it("maps a pixel to coordinate scale", () => {
-    expect(pixelToCoord(300, 600, 100)).toBe(50);
+describe("normalized mapping", () => {
+  it("maps a pixel to a 0..1 fraction of the canvas", () => {
+    expect(pixelToNorm(300, 600)).toBe(0.5);
   });
 
-  it("maps a coordinate back to pixels", () => {
-    expect(coordToPixel(50, 600, 100)).toBe(300);
+  it("maps a 0..1 fraction back to pixels", () => {
+    expect(normToPixel(0.5, 600)).toBe(300);
   });
 
   it("round-trips", () => {
-    expect(coordToPixel(pixelToCoord(123, 600, 100), 600, 100)).toBeCloseTo(123);
+    expect(normToPixel(pixelToNorm(123, 600), 600)).toBeCloseTo(123);
   });
 });
 
@@ -64,18 +64,24 @@ describe("serialize/deserialize", () => {
   const state = {
     xMax: 100,
     yMax: 80,
-    image: "data:image/png;base64,abc",
-    zones: [{ name: "Predok", color: "#22c55e", points: [[10, 20], [30, 40], [10, 40]] }],
+    image: "assets/podklad-nakres.jpg",
+    zones: [{ name: "Predok", color: "#22c55e", points: [[0.1, 0.25], [0.3, 0.5], [0.1, 0.5]] }],
   };
 
-  it("serializes points to strings", () => {
+  it("scales normalized points by xMax/yMax into the export string", () => {
     const obj = JSON.parse(serialize(state));
     expect(obj.zones[0].points).toBe("10,20 30,40 10,40");
     expect(obj.xMax).toBe(100);
-    expect(obj.image).toBe("data:image/png;base64,abc");
+    expect(obj.image).toBe("assets/podklad-nakres.jpg");
   });
 
   it("round-trips through serialize then deserialize", () => {
     expect(deserialize(serialize(state))).toEqual(state);
+  });
+
+  it("re-exports the same fractions at a different scale", () => {
+    const rescaled = { ...state, xMax: 200, yMax: 160 };
+    const obj = JSON.parse(serialize(rescaled));
+    expect(obj.zones[0].points).toBe("20,40 60,80 20,80");
   });
 });
