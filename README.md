@@ -18,11 +18,12 @@ npx serve .
 ## Usage
 
 - **Background image** — pick one from the dropdown (entries are defined in the
-  `ASSETS` list inside `index.html`).
+  `ASSETS` list inside `index.html`), or "none" to draw on a blank canvas.
 - **x-max / y-max** — the coordinate scale. The canvas uses this aspect ratio and the
   image is scaled into it (aspect ratio preserved).
 - **New polygon** — enter a name, pick a color from the palette, then click to add
   points. Click near the first point to close the polygon. `Esc` removes the last point.
+  The polygon's name is shown centered inside it.
 - **Delete** — click a finished polygon to select it, then press `Delete`.
 - **Export** — downloads a `.json` with `xMax`, `yMax`, `image` (path), and `zones`.
 - **Import** — loads such a `.json` and restores the scale, image, and polygons.
@@ -54,4 +55,9 @@ npm test
 
 ## Deployment
 
-Published as a static site on GitHub Pages from the repository root.
+Published as a static site on GitHub Pages from the repository root (`main` branch, `/`).
+
+Live: https://peterkmet.github.io/kosacka/
+
+`.nojekyll` disables Jekyll processing; relative paths keep the app working under the
+`/kosacka/` project subpath. Every push to `main` triggers a Pages rebuild.
