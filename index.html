@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mower Zones — Vector Drawing</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; }
+    #sidebar { width: 240px; padding: 12px; box-sizing: border-box; border-right: 1px solid #ccc; overflow-y: auto; }
+    #stage { flex: 1; position: relative; overflow: auto; background: #eef; }
+    #stage img { display: block; max-width: none; }
+    #svg { position: absolute; top: 0; left: 0; }
+    .row { margin-bottom: 10px; }
+    label { display: block; font-size: 12px; margin-bottom: 2px; }
+    input[type="number"] { width: 70px; }
+    button { display: block; width: 100%; margin-bottom: 6px; padding: 6px; cursor: pointer; }
+    #palette { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+    .swatch { height: 28px; border: 2px solid transparent; cursor: pointer; border-radius: 4px; }
+    .swatch.selected { border-color: #000; }
+    #zoneList li { font-size: 13px; cursor: pointer; padding: 2px 4px; }
+    #zoneList li.selected { background: #ddf; }
+    polygon { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <div class="row">
+      <label>Background image</label>
+      <input type="file" id="imageInput" accept="image/*" />
+    </div>
+    <div class="row">
+      <label>x-max</label><input type="number" id="xMax" />
+      <label>y-max</label><input type="number" id="yMax" />
+    </div>
+    <button id="newPolygon">New polygon</button>
+    <div class="row" id="paletteRow" style="display:none;">
+      <label>Pick color</label>
+      <div id="palette"></div>
+    </div>
+    <button id="exportBtn">Export</button>
+    <button id="importBtn">Import</button>
+    <input type="file" id="importInput" accept="application/json" style="display:none;" />
+    <div class="row">
+      <label>Zones</label>
+      <ul id="zoneList" style="padding-left:16px;"></ul>
+    </div>
+    <div class="row" style="font-size:12px;color:#666;">
+      Esc: remove last point · Delete: remove selected zone
+    </div>
+  </div>
+  <div id="stage">
+    <img id="bg" alt="" />
+    <svg id="svg"></svg>
+  </div>
+
+  <script type="module">
+    import {
+      CLOSE_THRESHOLD_PX, PALETTE, DEFAULT_X_MAX, DEFAULT_Y_MAX,
+      pixelToCoord, coordToPixel, isNearFirstPoint, serialize, deserialize,
+    } from "./logic.js";
+
+    const SVGNS = "http://www.w3.org/2000/svg";
+    const state = { xMax: DEFAULT_X_MAX, yMax: DEFAULT_Y_MAX, image: "", zones: [] };
+    let drawing = null;          // { name, color, points: number[][] (coord scale) }
+    let pendingColor = PALETTE[0];
+    let selectedIndex = -1;
+
+    const els = {
+      imageInput: document.getElementById("imageInput"),
+      xMax: document.getElementById("xMax"),
+      yMax: document.getElementById("yMax"),
+      newPolygon: document.getElementById("newPolygon"),
+      paletteRow: document.getElementById("paletteRow"),
+      palette: document.getElementById("palette"),
+      exportBtn: document.getElementById("exportBtn"),
+      importBtn: document.getElementById("importBtn"),
+      importInput: document.getElementById("importInput"),
+      zoneList: document.getElementById("zoneList"),
+      bg: document.getElementById("bg"),
+      svg: document.getElementById("svg"),
+      stage: document.getElementById("stage"),
+    };
+
+    els.xMax.value = state.xMax;
+    els.yMax.value = state.yMax;
+    els.xMax.addEventListener("change", () => { state.xMax = Number(els.xMax.value); });
+    els.yMax.addEventListener("change", () => { state.yMax = Number(els.yMax.value); });
+
+    function displaySize() {
+      return { w: els.bg.clientWidth, h: els.bg.clientHeight };
+    }
+
+    function syncSvgSize() {
+      const { w, h } = displaySize();
+      els.svg.setAttribute("width", w);
+      els.svg.setAttribute("height", h);
+    }
+
+    function setImage(dataUrl) {
+      state.image = dataUrl;
+      els.bg.src = dataUrl;
+    }
+    els.bg.addEventListener("load", () => { syncSvgSize(); render(); });
+
+    els.imageInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => setImage(reader.result);
+      reader.readAsDataURL(file);
+    });
+
+    // Build palette swatches.
+    PALETTE.forEach((color) => {
+      const sw = document.createElement("div");
+      sw.className = "swatch";
+      sw.style.background = color;
+      sw.addEventListener("click", () => {
+        pendingColor = color;
+        [...els.palette.children].forEach((c) => c.classList.remove("selected"));
+        sw.classList.add("selected");
+      });
+      els.palette.appendChild(sw);
+    });
+
+    els.newPolygon.addEventListener("click", () => {
+      const name = prompt("Polygon name:");
+      if (name === null || name.trim() === "") return;
+      els.paletteRow.style.display = "block";
+      drawing = { name: name.trim(), color: pendingColor, points: [] };
+      selectedIndex = -1;
+      render();
+    });
+
+    // Convert a mouse event to coord-scale point.
+    function eventToCoord(e) {
+      const rect = els.bg.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      const { w, h } = displaySize();
+      return [pixelToCoord(px, w, state.xMax), pixelToCoord(py, h, state.yMax)];
+    }
+
+    els.svg.addEventListener("click", (e) => {
+      if (!drawing) return;
+      const coord = eventToCoord(e);
+      const { w, h } = displaySize();
+      if (drawing.points.length >= 3) {
+        const firstPx = [
+          coordToPixel(drawing.points[0][0], w, state.xMax),
+          coordToPixel(drawing.points[0][1], h, state.yMax),
+        ];
+        const clickPx = [coordToPixel(coord[0], w, state.xMax), coordToPixel(coord[1], h, state.yMax)];
+        if (isNearFirstPoint(clickPx, firstPx, CLOSE_THRESHOLD_PX)) {
+          state.zones.push({ name: drawing.name, color: drawing.color, points: drawing.points });
+          drawing = null;
+          els.paletteRow.style.display = "none";
+          render();
+          return;
+        }
+      }
+      drawing.points.push(coord);
+      render();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && drawing) {
+        drawing.points.pop();
+        render();
+      } else if (e.key === "Delete" && selectedIndex >= 0) {
+        state.zones.splice(selectedIndex, 1);
+        selectedIndex = -1;
+        render();
+      }
+    });
+
+    function coordPointsToPixelString(points) {
+      const { w, h } = displaySize();
+      return points
+        .map(([x, y]) => `${coordToPixel(x, w, state.xMax)},${coordToPixel(y, h, state.yMax)}`)
+        .join(" ");
+    }
+
+    function render() {
+      els.svg.innerHTML = "";
+      state.zones.forEach((zone, i) => {
+        const poly = document.createElementNS(SVGNS, "polygon");
+        poly.setAttribute("points", coordPointsToPixelString(zone.points));
+        poly.setAttribute("fill", zone.color);
+        poly.setAttribute("fill-opacity", i === selectedIndex ? "0.6" : "0.35");
+        poly.setAttribute("stroke", zone.color);
+        poly.setAttribute("stroke-width", i === selectedIndex ? "3" : "1.5");
+        poly.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          if (drawing) return;
+          selectedIndex = i;
+          render();
+        });
+        els.svg.appendChild(poly);
+      });
+
+      if (drawing && drawing.points.length > 0) {
+        const line = document.createElementNS(SVGNS, "polyline");
+        line.setAttribute("points", coordPointsToPixelString(drawing.points));
+        line.setAttribute("fill", "none");
+        line.setAttribute("stroke", drawing.color);
+        line.setAttribute("stroke-width", "2");
+        els.svg.appendChild(line);
+        const { w, h } = displaySize();
+        drawing.points.forEach(([x, y]) => {
+          const c = document.createElementNS(SVGNS, "circle");
+          c.setAttribute("cx", coordToPixel(x, w, state.xMax));
+          c.setAttribute("cy", coordToPixel(y, h, state.yMax));
+          c.setAttribute("r", "4");
+          c.setAttribute("fill", drawing.color);
+          els.svg.appendChild(c);
+        });
+      }
+
+      renderZoneList();
+    }
+
+    function renderZoneList() {
+      els.zoneList.innerHTML = "";
+      state.zones.forEach((zone, i) => {
+        const li = document.createElement("li");
+        li.textContent = zone.name;
+        li.style.color = zone.color;
+        if (i === selectedIndex) li.classList.add("selected");
+        li.addEventListener("click", () => { selectedIndex = i; render(); });
+        els.zoneList.appendChild(li);
+      });
+    }
+
+    els.exportBtn.addEventListener("click", () => {
+      state.xMax = Number(els.xMax.value);
+      state.yMax = Number(els.yMax.value);
+      const blob = new Blob([serialize(state)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "zones.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    els.importBtn.addEventListener("click", () => els.importInput.click());
+    els.importInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const loaded = deserialize(reader.result);
+        state.xMax = loaded.xMax;
+        state.yMax = loaded.yMax;
+        state.zones = loaded.zones;
+        els.xMax.value = state.xMax;
+        els.yMax.value = state.yMax;
+        selectedIndex = -1;
+        drawing = null;
+        els.paletteRow.style.display = "none";
+        setImage(loaded.image);
+      };
+      reader.readAsText(file);
+    });
+
+    window.addEventListener("resize", () => { syncSvgSize(); render(); });
+  </script>
+</body>
+</html>
